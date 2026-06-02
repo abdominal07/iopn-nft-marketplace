@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IOPN NFT Collection</title>
+    <!-- On charge Ethers.js depuis un CDN, pas besoin de npm/node -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f0f2f5; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 10px; border: none; border-radius: 5px; color: white; }
+        .btn-connect { background: #f59e0b; }
+        .btn-mint { background: #10b981; }
+        #status { margin-top: 20px; color: #333; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>IOPN NFT</h1>
+    <p>Mint ton NFT sur le Testnet IOPN !</p>
+    
+    <button id="connectBtn" class="btn-connect">Connecter MetaMask</button>
+    <button id="mintBtn" class="btn-mint" style="display:none;">Mint NFT (Gratuit)</button>
+    
+    <p id="status"></p>
+</div>
+
+<script>
+    const CONTRACT_ADDRESS = "0x947D37af32CD984Db50AB376dDb0702615D0b28f";
+    
+    // L'ABI minimale pour dire au site comment parler au contrat
+    const ABI = [
+        "function mint(address to, string memory uri) public"
+    ];
+
+    let provider, signer, contract;
+
+    document.getElementById("connectBtn").onclick = async () => {
+        if (typeof window.ethereum === "undefined") {
+            alert("Installe MetaMask !");
+            return;
+        }
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        
+        const address = await signer.getAddress();
+        document.getElementById("status").innerText = "Connecté : " + address.substring(0,6) + "...";
+        document.getElementById("connectBtn").style.display = "none";
+        document.getElementById("mintBtn").style.display = "inline-block";
+    };
+
+    document.getElementById("mintBtn").onclick = async () => {
+        try {
+            document.getElementById("status").innerText = "Transaction en cours...";
+            const address = await signer.getAddress();
+            // Pour l'instant, on met un lien vide pour les métadonnées
+            const tx = await contract.mint(address, "ipfs://TON_LIEN_METADATA");
+            await tx.wait();
+            document.getElementById("status").innerText = "Succès ! NFT Minté ! 🎉";
+        } catch (err) {
+            document.getElementById("status").innerText = "Erreur : " + err.message.substring(0, 50);
+        }
+    };
+</script>
+
+</body>
+</html>
