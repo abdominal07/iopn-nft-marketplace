@@ -12,16 +12,15 @@
         .btn-connect { background: #f59e0b; }
         .btn-mint { background: #10b981; }
         .btn-fetch { background: #3b82f6; }
-        #status { margin-top: 20px; color: #333; }
+        #status { margin-top: 20px; color: #333; word-wrap: break-word; }
         
-        /* Style pour la fenêtre de sélection de Wallet (Mini-Privy) */
         .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border-radius: 12px; width: 300px; }
         .wallet-btn { width: 100%; padding: 15px; margin: 5px 0; background: #fff; color: #000; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;}
         .wallet-btn:hover { border-color: #3b82f6; background: #f9fafb; }
         .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
 
-        .nft-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; width: 200px; display: inline-block; margin-top: 20px; background: #fafafa; }
+        .nft-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; width: 250px; display: inline-block; margin-top: 20px; background: #fafafa; }
         .nft-card img { width: 100%; border-radius: 5px; }
     </style>
 </head>
@@ -43,7 +42,6 @@
     <div id="nftDisplay"></div>
 </div>
 
-<!-- Fenêtre Modale pour choisir le Wallet -->
 <div id="walletModal" class="modal">
   <div class="modal-content">
     <span class="close-btn" id="closeModal">&times;</span>
@@ -63,9 +61,8 @@
     ];
 
     let provider, signer, contract;
-    let selectedProvider; // Va stocker OKX ou MetaMask
+    let selectedProvider;
 
-    // --- GESTION DU MODAL (CHOIX DU WALLET) ---
     const modal = document.getElementById("walletModal");
     const connectBtn = document.getElementById("connectBtn");
 
@@ -73,29 +70,22 @@
     document.getElementById("closeModal").onclick = () => { modal.style.display = "none"; };
     window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
 
-    // Connexion avec OKX
     document.getElementById("okxConnect").onclick = async () => {
         if (typeof window.okxwallet !== "undefined") {
             selectedProvider = window.okxwallet;
             modal.style.display = "none";
             await connectWallet();
-        } else {
-            alert("OKX Wallet n'est pas installé !");
-        }
+        } else { alert("OKX Wallet n'est pas installé !"); }
     };
 
-    // Connexion avec MetaMask
     document.getElementById("metaConnect").onclick = async () => {
         if (typeof window.ethereum !== "undefined") {
             selectedProvider = window.ethereum;
             modal.style.display = "none";
             await connectWallet();
-        } else {
-            alert("MetaMask n'est pas installé !");
-        }
+        } else { alert("MetaMask n'est pas installé !"); }
     };
 
-    // --- FONCTIONS DU DAPP ---
     async function connectWallet() {
         try {
             provider = new ethers.BrowserProvider(selectedProvider);
@@ -122,19 +112,31 @@
             await tx.wait();
             document.getElementById("status").innerText = "Succès ! NFT Minté ! 🎉";
         } catch (err) {
-            document.getElementById("status").innerText = "Erreur : " + err.message.substring(0, 100);
+            console.error(err);
+            document.getElementById("status").innerText = "Erreur Mint.";
         }
     };
 
     document.getElementById("fetchBtn").onclick = async () => {
         try {
-            document.getElementById("status").innerText = "Chargement du NFT...";
+            document.getElementById("status").innerText = "Chargement du NFT #0...";
+            
+            // 1. Demander le lien au contrat
             const uri = await contract.tokenURI(0);
-            const httpUrl = uri.replace("ipfs://", "https://w3s.link/ipfs/");
+            
+            // 2. Utiliser le gateway ipfs.io (plus fiable que w3s.link)
+            const httpUrl = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
+            
+            // 3. Récupérer les métadonnées
             const response = await fetch(httpUrl);
+            if(!response.ok) throw new Error("Impossible de télécharger les métadonnées depuis IPFS");
+            
             const metadata = await response.json();
-            const imageUrl = metadata.image.replace("ipfs://", "https://w3s.link/ipfs/");
 
+            // 4. Lien de l'image
+            const imageUrl = metadata.image.replace("ipfs://", "https://ipfs.io/ipfs/");
+
+            // 5. Afficher
             document.getElementById("nftDisplay").innerHTML = `
                 <div class="nft-card">
                     <img src="${imageUrl}" alt="NFT Image">
@@ -142,9 +144,12 @@
                     <p>${metadata.description}</p>
                 </div>
             `;
-            document.getElementById("status").innerText = "NFT chargé avec succès !";
+            document.getElementById("status").innerText = "NFT #0 chargé avec succès !";
         } catch (err) {
-            document.getElementById("status").innerText = "Erreur : Le NFT #0 n'existe pas encore.";
+            // NOUVEAU : On affiche la VRAIE erreur pour comprendre ce qui bloque
+            console.error(err);
+            let errorMsg = err.reason || err.message;
+            document.getElementById("status").innerText = "Erreur : " + errorMsg.substring(0, 150);
         }
     };
 </script>
