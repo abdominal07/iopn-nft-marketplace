@@ -4,35 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IOPN NFT Collection</title>
-    <!-- On charge Ethers.js depuis un CDN, pas besoin de npm/node -->
+    <!-- Chargement de Ethers.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f0f2f5; }
-        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
         button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin: 10px; border: none; border-radius: 5px; color: white; }
         .btn-connect { background: #f59e0b; }
         .btn-mint { background: #10b981; }
+        .btn-fetch { background: #3b82f6; }
         #status { margin-top: 20px; color: #333; }
+        .nft-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; width: 200px; display: inline-block; margin-top: 20px; background: #fafafa; }
+        .nft-card img { width: 100%; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h1>IOPN NFT</h1>
+    <h1>IOPN NFT Collection</h1>
     <p>Mint ton NFT sur le Testnet IOPN !</p>
     
     <button id="connectBtn" class="btn-connect">Connecter MetaMask</button>
-    <button id="mintBtn" class="btn-mint" style="display:none;">Mint NFT (Gratuit)</button>
+    <button id="mintBtn" class="btn-mint" style="display:none;">Mint NFT</button>
     
     <p id="status"></p>
+
+    <hr style="margin: 30px 0;">
+
+    <h2>Marketplace / Collection</h2>
+    <button id="fetchBtn" class="btn-fetch" style="display:none;">Voir le NFT #0</button>
+    <div id="nftDisplay"></div>
 </div>
 
 <script>
+    // ATTENTION : Met ici l'adresse de ton contrat déployé avec Remix !
     const CONTRACT_ADDRESS = "0x947D37af32CD984Db50AB376dDb0702615D0b28f";
     
-    // L'ABI minimale pour dire au site comment parler au contrat
+    // Le vrai CID que tu m'as donné
+    const METADATA_CID = "bafkreiguappsizxhwwalgotc4jw6b56sj4ho3g7imsgkvgicf266e545nu";
+
+    // L'ABI (on ajoute tokenURI pour pouvoir lire les métadonnées)
     const ABI = [
-        "function mint(address to, string memory uri) public"
+        "function mint(address to, string memory uri) public",
+        "function tokenURI(uint256 tokenId) view returns (string)"
     ];
 
     let provider, signer, contract;
@@ -51,18 +65,51 @@
         document.getElementById("status").innerText = "Connecté : " + address.substring(0,6) + "...";
         document.getElementById("connectBtn").style.display = "none";
         document.getElementById("mintBtn").style.display = "inline-block";
+        document.getElementById("fetchBtn").style.display = "inline-block";
     };
 
     document.getElementById("mintBtn").onclick = async () => {
         try {
             document.getElementById("status").innerText = "Transaction en cours...";
             const address = await signer.getAddress();
-            // Pour l'instant, on met un lien vide pour les métadonnées
-            const tx = await contract.mint(address, "ipfs://TON_LIEN_METADATA");
+            // On utilise le vrai lien IPFS maintenant !
+            const tx = await contract.mint(address, "ipfs://" + METADATA_CID);
             await tx.wait();
             document.getElementById("status").innerText = "Succès ! NFT Minté ! 🎉";
         } catch (err) {
-            document.getElementById("status").innerText = "Erreur : " + err.message.substring(0, 50);
+            document.getElementById("status").innerText = "Erreur : " + err.message.substring(0, 100);
+        }
+    };
+
+    // NOUVEAU : Fonction pour afficher le NFT (Marketplace basique)
+    document.getElementById("fetchBtn").onclick = async () => {
+        try {
+            document.getElementById("status").innerText = "Chargement du NFT...";
+            
+            // 1. Demander au contrat le lien IPFS du Token 0
+            const uri = await contract.tokenURI(0);
+            
+            // 2. Transformer le lien ipfs:// en lien web lisible par le navigateur
+            const httpUrl = uri.replace("ipfs://", "https://w3s.link/ipfs/");
+            
+            // 3. Récupérer les métadonnées (nom, description, image)
+            const response = await fetch(httpUrl);
+            const metadata = await response.json();
+
+            // 4. Transformer le lien de l'image en lien web lisible
+            const imageUrl = metadata.image.replace("ipfs://", "https://w3s.link/ipfs/");
+
+            // 5. Afficher sur le site
+            document.getElementById("nftDisplay").innerHTML = `
+                <div class="nft-card">
+                    <img src="${imageUrl}" alt="NFT Image">
+                    <h3>${metadata.name}</h3>
+                    <p>${metadata.description}</p>
+                </div>
+            `;
+            document.getElementById("status").innerText = "NFT chargé avec succès !";
+        } catch (err) {
+            document.getElementById("status").innerText = "Erreur : Le NFT #0 n'existe pas encore (il faut faire un Mint d'abord !)";
         }
     };
 </script>
