@@ -40,7 +40,7 @@
 
     <h2>Marketplace / Collection</h2>
     <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
-        <input type="number" id="tokenIdInput" value="0" min="0">
+        <input type="number" id="tokenIdInput" value="1" min="0">
         <button id="fetchBtn" class="btn-fetch" style="display:none;">Voir ce NFT</button>
     </div>
     <div id="nftDisplay"></div>
@@ -56,12 +56,33 @@
 </div>
 
 <script>
+    // Correction automatique de la casse de l'adresse
     const CONTRACT_ADDRESS = ethers.getAddress("0x947d37af32cd984db50ab376dbb0702615d0b28f");
     const METADATA_CID = "bafkreiguappsizxhwwalgotc4jw6b56sj4ho3g7imsgkvgicf266e545nu";
 
+    // ABI Format JSON Standard (plus sûr)
     const ABI = [
-        "function mint(address to, string memory uri) public",
-        "function tokenURI(uint256 tokenId) view returns (string)"
+      {
+        "inputs": [
+          { "internalType": "address", "name": "to", "type": "address" },
+          { "internalType": "string", "name": "uri", "type": "string" }
+        ],
+        "name": "mint",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
+        ],
+        "name": "tokenURI",
+        "outputs": [
+          { "internalType": "string", "name": "", "type": "string" }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
     ];
 
     let provider, signer, contract;
@@ -126,19 +147,15 @@
             const tokenId = document.getElementById("tokenIdInput").value;
             document.getElementById("status").innerText = "Chargement du NFT #" + tokenId + "...";
             
-            // 1. Lecture du contrat
             const uri = await contract.tokenURI(tokenId);
             const httpUrl = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
             
-            // 2. On essaie de télécharger
             const response = await fetch(httpUrl);
             if(!response.ok) throw new Error("IPFS bloque le téléchargement");
 
-            // 3. On vérifie si c'est une image directe ou un fichier JSON
             const contentType = response.headers.get("content-type");
 
             if (contentType && contentType.startsWith("image")) {
-                // C'est directement une image (Comme ton NFT #0)
                 document.getElementById("nftDisplay").innerHTML = `
                     <div class="nft-card">
                         <img src="${httpUrl}" alt="NFT Image">
@@ -147,7 +164,6 @@
                 `;
                 document.getElementById("status").innerText = "Succès ! (Image directe) 🎉";
             } else {
-                // C'est un fichier JSON (Le standard normal)
                 const metadata = await response.json();
                 const imageUrl = metadata.image.replace("ipfs://", "https://ipfs.io/ipfs/");
                 document.getElementById("nftDisplay").innerHTML = `
@@ -161,10 +177,16 @@
             }
         } catch (err) {
             console.error("Erreur complete:", err);
-            let errorMsg = "Ce NFT n'existe pas ou IPFS est lent.";
-            if (err.reason) errorMsg = err.reason;
-            else if (err.message) errorMsg = err.message;
-            document.getElementById("status").innerText = "ERREUR : " + errorMsg.substring(0, 200);
+            
+            // Message d'erreur personnalisé pour le NFT #0
+            if (err.code === 'BAD_DATA' || err.message.includes('BAD_DATA')) {
+                document.getElementById("status").innerText = "Ce NFT a été minté vide (erreur de test). Mint un nouveau NFT et cherche le #1 !";
+            } else {
+                let errorMsg = "Ce NFT n'existe pas ou IPFS est lent.";
+                if (err.reason) errorMsg = err.reason;
+                else if (err.message) errorMsg = err.message;
+                document.getElementById("status").innerText = "ERREUR : " + errorMsg.substring(0, 200);
+            }
         }
     };
 </script>
