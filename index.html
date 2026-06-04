@@ -3,191 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IOPN NFT Collection</title>
+    <title>IOPN NFT Marketplace</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f0f2f5; }
-        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
-        button { padding: 12px 20px; font-size: 16px; cursor: pointer; margin: 5px; border: none; border-radius: 8px; color: white; font-weight: bold; }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f0f2f5; }
+        .container { max-width: 800px; margin: auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        button { padding: 10px 15px; font-size: 14px; cursor: pointer; margin: 5px; border: none; border-radius: 8px; color: white; font-weight: bold; }
         .btn-connect { background: #f59e0b; }
         .btn-mint { background: #10b981; }
-        .btn-fetch { background: #3b82f6; }
-        #status { margin-top: 20px; color: #333; word-wrap: break-word; font-size: 14px;}
-        
-        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border-radius: 12px; width: 300px; }
-        .wallet-btn { width: 100%; padding: 15px; margin: 5px 0; background: #fff; color: #000; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;}
-        .wallet-btn:hover { border-color: #3b82f6; background: #f9fafb; }
-        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
-
-        .nft-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; width: 250px; display: inline-block; margin-top: 20px; background: #fafafa; }
-        .nft-card img { width: 100%; border-radius: 5px; }
-        input { padding: 10px; font-size: 16px; width: 60px; text-align: center; border-radius: 8px; border: 1px solid #ddd; }
+        .btn-approve { background: #8b5cf6; }
+        .btn-list { background: #ef4444; }
+        .btn-buy { background: #3b82f6; }
+        .btn-cancel { background: #6b7280; }
+        input { padding: 8px; font-size: 14px; border-radius: 8px; border: 1px solid #ddd; margin: 5px; }
+        #status { margin-top: 10px; color: #333; word-wrap: break-word; font-size: 14px;}
+        .nft-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; width: 200px; display: inline-block; margin: 10px; background: #fafafa; vertical-align: top; }
+        .nft-card img { width: 100%; border-radius: 5px; height: 150px; object-fit: cover; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h1>IOPN NFT Collection</h1>
-    <p>Mint ton NFT sur le Testnet IOPN !</p>
-    
-    <button id="connectBtn" class="btn-connect">🦊 / 🔶 Connecter Wallet</button>
-    <button id="mintBtn" class="btn-mint" style="display:none;">Mint NFT</button>
-    
-    <p id="status"></p>
-
-    <hr style="margin: 30px 0;">
-
-    <h2>Marketplace / Collection</h2>
-    <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
-        <input type="number" id="tokenIdInput" value="1" min="0">
-        <button id="fetchBtn" class="btn-fetch" style="display:none;">Voir ce NFT</button>
+<div class="container">
+    <div class="card">
+        <h1>IOPN NFT Marketplace</h1>
+        <button id="connectBtn" class="btn-connect">🦊 / 🔶 Connecter Wallet</button>
+        <p id="walletAddress"></p>
     </div>
-    <div id="nftDisplay"></div>
-</div>
 
-<div id="walletModal" class="modal">
-  <div class="modal-content">
-    <span class="close-btn" id="closeModal">&times;</span>
-    <h3>Choisis ton Wallet</h3>
-    <button class="wallet-btn" id="okxConnect">🔶 OKX Wallet</button>
-    <button class="wallet-btn" id="metaConnect">🦊 MetaMask</button>
-  </div>
+    <div class="card">
+        <h2>1. Mint un NFT</h2>
+        <button id="mintBtn" class="btn-mint" style="display:none;">Mint NFT</button>
+    </div>
+
+    <div class="card">
+        <h2>2. Vendre un NFT</h2>
+        <p><small>Étape A : Autoriser le Marketplace</small></p>
+        <input type="number" id="approveTokenId" placeholder="ID du NFT (ex: 0)">
+        <button id="approveBtn" class="btn-approve" style="display:none;">Approuver la Vente</button>
+        
+        <p><small>Étape B : Mettre en vente (Prix en IOPN)</small></p>
+        <input type="number" id="listTokenId" placeholder="ID du NFT">
+        <input type="number" id="listPrice" placeholder="Prix en IOPN (ex: 1)">
+        <button id="listBtn" class="btn-list" style="display:none;">Mettre en Vente</button>
+    </div>
+
+    <div class="card">
+        <h2>3. Marketplace (Acheter)</h2>
+        <input type="number" id="buyTokenId" placeholder="ID du NFT à acheter">
+        <button id="checkPriceBtn" class="btn-buy" style="display:none;">Vérifier le Prix</button>
+        <button id="buyBtn" class="btn-buy" style="display:none;">Acheter</button>
+        <button id="cancelBtn" class="btn-cancel" style="display:none;">Annuler ma Vente</button>
+        <p id="priceDisplay"></p>
+    </div>
+
+    <div class="card">
+        <h2>Collection</h2>
+        <input type="number" id="viewTokenId" placeholder="ID du NFT" value="0">
+        <button id="fetchBtn" class="btn-buy" style="display:none;">Voir ce NFT</button>
+        <div id="nftDisplay"></div>
+    </div>
+
+    <p id="status"></p>
 </div>
 
 <script>
-    // Correction automatique de la casse de l'adresse
-    const CONTRACT_ADDRESS = ethers.getAddress("0xc297F8e2De5482c93c41A41E3C9b41C3b841F9D7");
+    // ========== ADDRESSES A REMPLIR ==========
+    const NFT_ADDRESS = ethers.getAddress("0xc297F8e2De5482c93c41A41E3C9b41C3b841F9D7");
+    const MARKET_ADDRESS = ethers.getAddress("0xfBEa85a1f9F152D9a0e52744C673413046B3cf91");
     const METADATA_CID = "bafkreiguappsizxhwwalgotc4jw6b56sj4ho3g7imsgkvgicf266e545nu";
+    // ========================================
 
-    // ABI Format JSON Standard (plus sûr)
-    const ABI = [
-      {
-        "inputs": [
-          { "internalType": "address", "name": "to", "type": "address" },
-          { "internalType": "string", "name": "uri", "type": "string" }
-        ],
-        "name": "mint",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          { "internalType": "uint256", "name": "tokenId", "type": "uint256" }
-        ],
-        "name": "tokenURI",
-        "outputs": [
-          { "internalType": "string", "name": "", "type": "string" }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      }
+    const NFT_ABI = [
+      "function mint(address to, string memory uri) public",
+      "function tokenURI(uint256 tokenId) view returns (string)",
+      "function approve(address to, uint256 tokenId) public",
+      "function getApproved(uint256 tokenId) view returns (address)"
     ];
 
-    let provider, signer, contract;
-    let selectedProvider;
+    const MARKET_ABI = [
+      "function listNFT(address nftAddress, uint256 tokenId, uint256 price) external",
+      "function buyNFT(address nftAddress, uint256 tokenId) external payable",
+      "function cancelListing(address nftAddress, uint256 tokenId) external",
+      "function getListing(address nftAddress, uint256 tokenId) external view returns (uint256)"
+    ];
 
-    const modal = document.getElementById("walletModal");
-    const connectBtn = document.getElementById("connectBtn");
+    let provider, signer, nftContract, marketContract;
 
-    connectBtn.onclick = () => { modal.style.display = "block"; };
-    document.getElementById("closeModal").onclick = () => { modal.style.display = "none"; };
-    window.onclick = (event) => { if (event.target == modal) modal.style.display = "none"; };
-
-    document.getElementById("okxConnect").onclick = async () => {
-        if (typeof window.okxwallet !== "undefined") {
-            selectedProvider = window.okxwallet;
-            modal.style.display = "none";
-            await connectWallet();
-        } else { alert("OKX Wallet n'est pas installé !"); }
-    };
-
-    document.getElementById("metaConnect").onclick = async () => {
-        if (typeof window.ethereum !== "undefined") {
-            selectedProvider = window.ethereum;
-            modal.style.display = "none";
-            await connectWallet();
-        } else { alert("MetaMask n'est pas installé !"); }
-    };
-
-    async function connectWallet() {
+    // --- LOGIQUE CONNEXION ---
+    document.getElementById("connectBtn").onclick = async () => {
         try {
+            let selectedProvider = window.okxwallet || window.ethereum;
+            if (!selectedProvider) return alert("Installe un Wallet !");
+            
             provider = new ethers.BrowserProvider(selectedProvider);
             await provider.send("eth_requestAccounts", []);
             signer = await provider.getSigner();
-            contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+            
+            nftContract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
+            marketContract = new ethers.Contract(MARKET_ADDRESS, MARKET_ABI, signer);
             
             const address = await signer.getAddress();
-            document.getElementById("status").innerText = "Connecté : " + address.substring(0,6) + "...";
+            document.getElementById("walletAddress").innerText = "Connecté : " + address.substring(0,6) + "...";
             document.getElementById("connectBtn").style.display = "none";
-            document.getElementById("mintBtn").style.display = "inline-block";
-            document.getElementById("fetchBtn").style.display = "inline-block";
-        } catch (err) {
-            console.error(err);
-            document.getElementById("status").innerText = "Erreur de connexion.";
-        }
-    }
+            
+            // Afficher tous les boutons
+            const buttons = ["mintBtn", "approveBtn", "listBtn", "checkPriceBtn", "buyBtn", "cancelBtn", "fetchBtn"];
+            buttons.forEach(id => document.getElementById(id).style.display = "inline-block");
+            
+        } catch (err) { console.error(err); }
+    };
 
+    // --- 1. MINT ---
     document.getElementById("mintBtn").onclick = async () => {
         try {
-            document.getElementById("status").innerText = "Transaction en cours...";
+            document.getElementById("status").innerText = "Mint en cours...";
             const address = await signer.getAddress();
-            const tx = await contract.mint(address, "ipfs://" + METADATA_CID);
+            const tx = await nftContract.mint(address, "ipfs://" + METADATA_CID);
             await tx.wait();
-            document.getElementById("status").innerText = "Succès ! Nouveau NFT Minté ! 🎉";
-        } catch (err) {
+            document.getElementById("status").innerText = "NFT Minté ! 🎉";
+        } catch (err) { document.getElementById("status").innerText = "Erreur Mint"; }
+    };
+
+    // --- 2A. APPROVE ---
+    document.getElementById("approveBtn").onclick = async () => {
+        try {
+            const tokenId = document.getElementById("approveTokenId").value;
+            document.getElementById("status").innerText = "Approbation en cours...";
+            const tx = await nftContract.approve(MARKET_ADDRESS, tokenId);
+            await tx.wait();
+            document.getElementById("status").innerText = "Approuvé ! Tu peux le mettre en vente.";
+        } catch (err) { document.getElementById("status").innerText = "Erreur Approbation"; }
+    };
+
+    // --- 2B. LIST ---
+    document.getElementById("listBtn").onclick = async () => {
+        try {
+            const tokenId = document.getElementById("listTokenId").value;
+            const price = document.getElementById("listPrice").value;
+            const priceInWei = ethers.parseEther(price); // Convertir IOPN en Wei
+            
+            document.getElementById("status").innerText = "Mise en vente...";
+            const tx = await marketContract.listNFT(NFT_ADDRESS, tokenId, priceInWei);
+            await tx.wait();
+            document.getElementById("status").innerText = "NFT #" + tokenId + " en vente pour " + price + " IOPN ! 🏷️";
+        } catch (err) { 
             console.error(err);
-            document.getElementById("status").innerText = "Erreur Mint.";
+            document.getElementById("status").innerText = "Erreur Vente: " + (err.reason || "Vérifie l'approbation"); 
         }
     };
 
+    // --- 3. CHECK PRICE ---
+    document.getElementById("checkPriceBtn").onclick = async () => {
+        try {
+            const tokenId = document.getElementById("buyTokenId").value;
+            const priceInWei = await marketContract.getListing(NFT_ADDRESS, tokenId);
+            const priceInIOPN = ethers.formatEther(priceInWei);
+            
+            if(priceInWei == 0) {
+                document.getElementById("priceDisplay").innerText = "Ce NFT n'est pas en vente.";
+            } else {
+                document.getElementById("priceDisplay").innerText = "Prix : " + priceInIOPN + " IOPN";
+            }
+        } catch (err) { document.getElementById("priceDisplay").innerText = "Erreur"; }
+    };
+
+    // --- 3. BUY ---
+    document.getElementById("buyBtn").onclick = async () => {
+        try {
+            const tokenId = document.getElementById("buyTokenId").value;
+            const priceInWei = await marketContract.getListing(NFT_ADDRESS, tokenId);
+            
+            if(priceInWei == 0) return alert("Pas en vente !");
+            
+            document.getElementById("status").innerText = "Achat en cours...";
+            const tx = await marketContract.buyNFT(NFT_ADDRESS, tokenId, { value: priceInWei });
+            await tx.wait();
+            document.getElementById("status").innerText = "NFT Acheté ! C'est à toi ! 🎊";
+        } catch (err) { document.getElementById("status").innerText = "Erreur Achat"; }
+    };
+
+    // --- 3. CANCEL ---
+    document.getElementById("cancelBtn").onclick = async () => {
+        try {
+            const tokenId = document.getElementById("buyTokenId").value;
+            document.getElementById("status").innerText = "Annulation...";
+            const tx = await marketContract.cancelListing(NFT_ADDRESS, tokenId);
+            await tx.wait();
+            document.getElementById("status").innerText = "Vente annulée.";
+        } catch (err) { document.getElementById("status").innerText = "Erreur Annulation"; }
+    };
+
+    // --- VOIR NFT ---
     document.getElementById("fetchBtn").onclick = async () => {
         try {
-            const tokenId = document.getElementById("tokenIdInput").value;
-            document.getElementById("status").innerText = "Chargement du NFT #" + tokenId + "...";
+            const tokenId = document.getElementById("viewTokenId").value;
+            document.getElementById("status").innerText = "Chargement...";
             
-            const uri = await contract.tokenURI(tokenId);
+            const uri = await nftContract.tokenURI(tokenId);
             const httpUrl = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
-            
             const response = await fetch(httpUrl);
-            if(!response.ok) throw new Error("IPFS bloque le téléchargement");
+            const metadata = await response.json();
+            const imageUrl = metadata.image.replace("ipfs://", "https://ipfs.io/ipfs/");
 
-            const contentType = response.headers.get("content-type");
+            // Vérifier s'il est en vente
+            const priceInWei = await marketContract.getListing(NFT_ADDRESS, tokenId);
+            const saleText = priceInWei > 0 ? `En vente pour ${ethers.formatEther(priceInWei)} IOPN` : "Non en vente";
 
-            if (contentType && contentType.startsWith("image")) {
-                document.getElementById("nftDisplay").innerHTML = `
-                    <div class="nft-card">
-                        <img src="${httpUrl}" alt="NFT Image">
-                        <h3>IOPN NFT #${tokenId}</h3>
-                    </div>
-                `;
-                document.getElementById("status").innerText = "Succès ! (Image directe) 🎉";
-            } else {
-                const metadata = await response.json();
-                const imageUrl = metadata.image.replace("ipfs://", "https://ipfs.io/ipfs/");
-                document.getElementById("nftDisplay").innerHTML = `
-                    <div class="nft-card">
-                        <img src="${imageUrl}" alt="NFT Image">
-                        <h3>${metadata.name}</h3>
-                        <p>${metadata.description}</p>
-                    </div>
-                `;
-                document.getElementById("status").innerText = "Succès ! NFT #" + tokenId + " chargé ! 🎉";
-            }
-        } catch (err) {
-            console.error("Erreur complete:", err);
-            
-            // Message d'erreur personnalisé pour le NFT #0
-            if (err.code === 'BAD_DATA' || err.message.includes('BAD_DATA')) {
-                document.getElementById("status").innerText = "Ce NFT a été minté vide (erreur de test). Mint un nouveau NFT et cherche le #1 !";
-            } else {
-                let errorMsg = "Ce NFT n'existe pas ou IPFS est lent.";
-                if (err.reason) errorMsg = err.reason;
-                else if (err.message) errorMsg = err.message;
-                document.getElementById("status").innerText = "ERREUR : " + errorMsg.substring(0, 200);
-            }
-        }
+            document.getElementById("nftDisplay").innerHTML = `
+                <div class="nft-card">
+                    <img src="${imageUrl}" alt="NFT">
+                    <h3>${metadata.name} #${tokenId}</h3>
+                    <p>${saleText}</p>
+                </div>
+            `;
+            document.getElementById("status").innerText = "";
+        } catch (err) { document.getElementById("status").innerText = "Erreur de chargement."; }
     };
 </script>
 
