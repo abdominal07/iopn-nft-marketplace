@@ -22,6 +22,7 @@
 
         .nft-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; width: 250px; display: inline-block; margin-top: 20px; background: #fafafa; }
         .nft-card img { width: 100%; border-radius: 5px; }
+        input { padding: 10px; font-size: 16px; width: 60px; text-align: center; border-radius: 8px; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -38,7 +39,10 @@
     <hr style="margin: 30px 0;">
 
     <h2>Marketplace / Collection</h2>
-    <button id="fetchBtn" class="btn-fetch" style="display:none;">Voir le NFT #0</button>
+    <div style="display: flex; justify-content: center; align-items: center; gap: 10px;">
+        <input type="number" id="tokenIdInput" value="0" min="0">
+        <button id="fetchBtn" class="btn-fetch" style="display:none;">Voir ce NFT</button>
+    </div>
     <div id="nftDisplay"></div>
 </div>
 
@@ -52,8 +56,7 @@
 </div>
 
 <script>
-    // TON ADRESSE EXACTE TROUVEE SUR L'EXPLORATEUR
-    const CONTRACT_ADDRESS = "0x947D37af32CD984Db50AB376dDb0702615D0b28f";
+    const CONTRACT_ADDRESS = "0x947D37af32CD984Db50AB376dBb0702615D0b28f";
     const METADATA_CID = "bafkreiguappsizxhwwalgotc4jw6b56sj4ho3g7imsgkvgicf266e545nu";
 
     const ABI = [
@@ -111,7 +114,7 @@
             const address = await signer.getAddress();
             const tx = await contract.mint(address, "ipfs://" + METADATA_CID);
             await tx.wait();
-            document.getElementById("status").innerText = "Succès ! NFT Minté ! 🎉";
+            document.getElementById("status").innerText = "Succès ! Nouveau NFT Minté ! 🎉";
         } catch (err) {
             console.error(err);
             document.getElementById("status").innerText = "Erreur Mint.";
@@ -120,40 +123,48 @@
 
     document.getElementById("fetchBtn").onclick = async () => {
         try {
-            document.getElementById("status").innerText = "Étape 1 : Lecture du contrat...";
+            const tokenId = document.getElementById("tokenIdInput").value;
+            document.getElementById("status").innerText = "Chargement du NFT #" + tokenId + "...";
             
             // 1. Lecture du contrat
-            const uri = await contract.tokenURI(0);
-            document.getElementById("status").innerText = "Étape 2 : Lien trouvé (" + uri.substring(0,30) + "...)";
-            
-            // 2. Conversion du lien IPFS
+            const uri = await contract.tokenURI(tokenId);
             const httpUrl = uri.replace("ipfs://", "https://ipfs.io/ipfs/");
-            document.getElementById("status").innerText = "Étape 3 : Téléchargement métadonnées...";
             
-            // 3. Récupération JSON
+            // 2. On essaie de télécharger
             const response = await fetch(httpUrl);
             if(!response.ok) throw new Error("IPFS bloque le téléchargement");
-            const metadata = await response.json();
-            
-            document.getElementById("status").innerText = "Étape 4 : Affichage de l'image...";
-            const imageUrl = metadata.image.replace("ipfs://", "https://ipfs.io/ipfs/");
 
-            // 4. Affichage
-            document.getElementById("nftDisplay").innerHTML = `
-                <div class="nft-card">
-                    <img src="${imageUrl}" alt="NFT Image">
-                    <h3>${metadata.name}</h3>
-                    <p>${metadata.description}</p>
-                </div>
-            `;
-            document.getElementById("status").innerText = "Succès ! NFT chargé ! 🎉";
+            // 3. On vérifie si c'est une image directe ou un fichier JSON
+            const contentType = response.headers.get("content-type");
+
+            if (contentType && contentType.startsWith("image")) {
+                // C'est directement une image (Comme ton NFT #0)
+                document.getElementById("nftDisplay").innerHTML = `
+                    <div class="nft-card">
+                        <img src="${httpUrl}" alt="NFT Image">
+                        <h3>IOPN NFT #${tokenId}</h3>
+                    </div>
+                `;
+                document.getElementById("status").innerText = "Succès ! (Image directe) 🎉";
+            } else {
+                // C'est un fichier JSON (Le standard normal)
+                const metadata = await response.json();
+                const imageUrl = metadata.image.replace("ipfs://", "https://ipfs.io/ipfs/");
+                document.getElementById("nftDisplay").innerHTML = `
+                    <div class="nft-card">
+                        <img src="${imageUrl}" alt="NFT Image">
+                        <h3>${metadata.name}</h3>
+                        <p>${metadata.description}</p>
+                    </div>
+                `;
+                document.getElementById("status").innerText = "Succès ! NFT #" + tokenId + " chargé ! 🎉";
+            }
         } catch (err) {
             console.error("Erreur complete:", err);
-            let errorMsg = "Erreur inconnue";
+            let errorMsg = "Ce NFT n'existe pas ou IPFS est lent.";
             if (err.reason) errorMsg = err.reason;
             else if (err.message) errorMsg = err.message;
-            
-            document.getElementById("status").innerText = "ERREUR BLOQUANTE : " + errorMsg.substring(0, 300);
+            document.getElementById("status").innerText = "ERREUR : " + errorMsg.substring(0, 200);
         }
     };
 </script>
