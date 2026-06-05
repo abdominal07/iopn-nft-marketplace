@@ -4,30 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IOPN Marketplace</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root {
-            --bg-main: #0b0e11;
-            --bg-card: #1e2329;
-            --bg-input: #2b3139;
-            --border: #474d57;
-            --text-main: #eaecef;
-            --text-sec: #848e9c;
-            --accent-blue: #2563eb;
-            --accent-purple: #d946ef;
-            --accent-red: #ef4444;
-            --accent-green: #10b981;
+            --bg-main: #0b0e11; --bg-card: #1e2329; --bg-input: #2b3139;
+            --border: #474d57; --text-main: #eaecef; --text-sec: #848e9c;
+            --accent-blue: #2563eb; --accent-purple: #d946ef; --accent-red: #ef4444; --accent-green: #10b981;
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-        
         body { background-color: var(--bg-main); color: var(--text-main); min-height: 100vh; }
         
         .navbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; border-bottom: 1px solid var(--border); background-color: var(--bg-main); position: sticky; top: 0; z-index: 100; }
         .logo { font-size: 24px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(to right, var(--accent-purple), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .btn-connect { background: transparent; color: var(--text-main); border: 1px solid var(--border); padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-connect:hover { border-color: var(--text-main); }
         
+        /* Le bouton Reown s'intègre tout seul, on ajuste juste un peu */
+        w3m-button { --w3m-color-bg: var(--accent-blue); --w3m-color-mix: 0%; }
+
         .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
         .hero { text-align: center; margin-bottom: 60px; }
         .hero h1 { font-size: 48px; margin-bottom: 10px; }
@@ -69,7 +60,8 @@
 
     <nav class="navbar">
         <div class="logo">IOPN MARKETPLACE</div>
-        <button id="connectBtn" class="btn-connect">Connect Wallet</button>
+        <!-- Bouton Reown : il gère tout seul la connexion ! -->
+        <w3m-button></w3m-button>
     </nav>
 
     <div class="container">
@@ -92,12 +84,27 @@
 
     <div class="status-bar" id="statusBar">Chargement...</div>
 
-<script>
-    // ========== ADDRESSES A REMPLIR OBLIGATOIREMENT ==========
-    const NFT_ADDRESS = ethers.getAddress("0xc297F8e2De5482c93c41A41E3C9b41C3b841F9D7");
-    const MARKET_ADDRESS = ethers.getAddress("0xfBEa85a1f9F152D9a0e52744C673413046B3cf91");
+<!-- IMPORTATION DES MODULES MODERNES (Pas besoin de npm !) -->
+<script type="module">
+    import { ethers } from 'https://esm.sh/ethers@6.13.4'
+    import { createAppKit } from 'https://esm.sh/@reown/appkit@1.1.3'
+    import { EthersAdapter } from 'https://esm.sh/@reown/appkit-adapter-ethers@1.1.3?deps=ethers@6.13.4'
+
+    // ========== CONFIGURATION OBLIGATOIRE ==========
+    const NFT_ADDRESS = "0xc297F8e2De5482c93c41A41E3C9b41C3b841F9D7"; // Remplace
+    const MARKET_ADDRESS = "0xfBEa85a1f9F152D9a0e52744C673413046B3cf91"; // Remplace
     const METADATA_CID = "bafkreiguappsizxhwwalgotc4jw6b56sj4ho3g7imsgkvgicf266e545nu";
-    // ========================================================
+    const WC_PROJECT_ID = "5cc4861a079d75fe429b310014e36507"; // Colle ton Project ID ici
+    
+    // CONFIGURATION DU RESEAU IOPN (Reown l'ajoutera tout seul aux wallets !)
+    const iopnNetwork = {
+        id: 901, // LE VRAI CHAIN ID DE IOPN (en nombre)
+        name: 'IOPN Testnet',
+        currency: 'IOPN',
+        explorerUrl: 'https://testnet-scan.iopn.io', // LE VRAI LIEN DE L'EXPLORER
+        rpcUrl: 'https://testnet-rpc.iopn.io' // LE VRAI LIEN RPC DE IOPN
+    };
+    // ==============================================
 
     const NFT_ABI = [
       "function mint(address to, string memory uri) public",
@@ -115,6 +122,47 @@
 
     let provider, signer, nftContract, marketContract, userAddress;
 
+    // --- 1. INITIALISATION REOWN APPKIT ---
+    const adapter = new EthersAdapter();
+    
+    const modal = createAppKit({
+      adapters: [adapter],
+      networks: [iopnNetwork], // On déclare IOPN ici
+      projectId: WC_PROJECT_ID,
+      features: {
+        analytics: true,
+        injectUnsupportedChain: true // Permet d'ajouter le réseau automatiquement !
+      }
+    });
+
+    // --- 2. GESTION DE LA CONNEXION ---
+    modal.subscribeEvents((event) => {
+        if (event.data.event === 'CONNECT_SUCCESS') {
+            initDApp();
+        }
+        if (event.data.event === 'DISCONNECT') {
+            document.getElementById('mintBtn').style.display = 'none';
+            document.getElementById('searchBtn').style.display = 'none';
+        }
+    });
+
+    async function initDApp() {
+        try {
+            const walletProvider = await modal.getWalletProvider();
+            provider = new ethers.BrowserProvider(walletProvider);
+            signer = await provider.getSigner();
+            userAddress = await signer.getAddress();
+            
+            nftContract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
+            marketContract = new ethers.Contract(MARKET_ADDRESS, MARKET_ABI, signer);
+            
+            document.getElementById('mintBtn').style.display = 'inline-block';
+            document.getElementById('searchBtn').style.display = 'inline-block';
+            
+            loadNFT(0);
+        } catch(err) { console.error(err); }
+    }
+
     function showStatus(msg, isError=false) {
         const bar = document.getElementById("statusBar");
         bar.style.display = "block";
@@ -123,30 +171,7 @@
         if(!isError) setTimeout(() => { bar.style.display = "none"; }, 4000);
     }
 
-    document.getElementById("connectBtn").onclick = async () => {
-        try {
-            let selectedProvider = window.okxwallet || window.ethereum;
-            if (!selectedProvider) return alert("Installe OKX ou MetaMask !");
-            
-            provider = new ethers.BrowserProvider(selectedProvider);
-            await provider.send("eth_requestAccounts", []);
-            signer = await provider.getSigner();
-            userAddress = await signer.getAddress();
-            
-            nftContract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
-            marketContract = new ethers.Contract(MARKET_ADDRESS, MARKET_ABI, signer);
-            
-            document.getElementById("connectBtn").innerText = userAddress.substring(0, 6) + "..." + userAddress.substring(38);
-            document.getElementById("connectBtn").style.borderColor = "var(--accent-green)";
-            
-            document.getElementById("mintBtn").style.display = "inline-block";
-            document.getElementById("searchBtn").style.display = "inline-block";
-            
-            loadNFT(0);
-            
-        } catch (err) { console.error(err); }
-    };
-
+    // --- 3. LOGIQUE DU DAPP ---
     document.getElementById("mintBtn").onclick = async () => {
         try {
             showStatus("Transaction de Mint en cours...");
@@ -180,20 +205,19 @@
             const isOwner = owner.toLowerCase() === userAddress.toLowerCase();
 
             let priceHTML = isListed ? `<div class="price-tag">Prix : ${priceInIOPN} IOPN</div>` : `<div class="price-tag" style="color:var(--text-sec);">Non en vente</div>`;
-            
             let statusText = isOwner ? "Vous êtes le propriétaire" : `Propriétaire : ${owner.substring(0,4)}...${owner.substring(38)}`;
             
             let actionHTML = "";
             if(isOwner && !isListed) {
                 actionHTML = `
                     <input type="number" id="price-input-${tokenId}" class="input-price" placeholder="Prix en IOPN (ex: 1.5)">
-                    <button class="btn-action btn-approve" onclick="approveNFT(${tokenId})">1. Approuver la Vente</button>
-                    <button class="btn-action btn-sell" onclick="listNFT(${tokenId})">2. Mettre en Vente</button>
+                    <button class="btn-action btn-approve" onclick="window.approveNFT(${tokenId})">1. Approuver la Vente</button>
+                    <button class="btn-action btn-sell" onclick="window.listNFT(${tokenId})">2. Mettre en Vente</button>
                 `;
             } else if (isOwner && isListed) {
-                actionHTML = `<button class="btn-action btn-cancel" onclick="cancelNFT(${tokenId})">Annuler la Vente</button>`;
+                actionHTML = `<button class="btn-action btn-cancel" onclick="window.cancelNFT(${tokenId})">Annuler la Vente</button>`;
             } else if (!isOwner && isListed) {
-                actionHTML = `<button class="btn-action btn-buy" onclick="buyNFT(${tokenId}, ${priceInWei})">Acheter pour ${priceInIOPN} IOPN</button>`;
+                actionHTML = `<button class="btn-action btn-buy" onclick="window.buyNFT(${tokenId}, ${priceInWei})">Acheter pour ${priceInIOPN} IOPN</button>`;
             } else {
                 actionHTML = `<div style="text-align:center; color:var(--text-sec);">Non disponible</div>`;
             }
@@ -217,7 +241,8 @@
         }
     }
 
-    async function approveNFT(tokenId) {
+    // Rendre les fonctions accessibles pour les boutons HTML
+    window.approveNFT = async (tokenId) => {
         try {
             showStatus("Approbation en cours...");
             const tx = await nftContract.approve(MARKET_ADDRESS, tokenId);
@@ -226,7 +251,7 @@
         } catch (err) { showStatus("Erreur d'approbation", true); }
     }
 
-    async function listNFT(tokenId) {
+    window.listNFT = async (tokenId) => {
         try {
             const priceInput = document.getElementById(`price-input-${tokenId}`).value;
             if(!priceInput || priceInput <= 0) return showStatus("Entrez un prix valide", true);
@@ -240,7 +265,7 @@
         } catch (err) { showStatus("Erreur de mise en vente", true); }
     }
 
-    async function cancelNFT(tokenId) {
+    window.cancelNFT = async (tokenId) => {
         try {
             showStatus("Annulation en cours...");
             const tx = await marketContract.cancelListing(NFT_ADDRESS, tokenId);
@@ -250,7 +275,7 @@
         } catch (err) { showStatus("Erreur d'annulation", true); }
     }
 
-    async function buyNFT(tokenId, priceInWei) {
+    window.buyNFT = async (tokenId, priceInWei) => {
         try {
             showStatus("Transaction d'achat en cours...");
             const tx = await marketContract.buyNFT(NFT_ADDRESS, tokenId, { value: priceInWei });
