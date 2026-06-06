@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IOPN Marketplace</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root {
             --bg-main: #0b0e11; --bg-card: #1e2329; --bg-input: #2b3139;
@@ -15,10 +16,9 @@
         
         .navbar { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; border-bottom: 1px solid var(--border); background-color: var(--bg-main); position: sticky; top: 0; z-index: 100; }
         .logo { font-size: 24px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(to right, var(--accent-purple), var(--accent-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .btn-connect { background: var(--accent-blue); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-connect:hover { opacity: 0.8; }
         
-        /* Le bouton Reown s'intègre tout seul, on ajuste juste un peu */
-        w3m-button { --w3m-color-bg: var(--accent-blue); --w3m-color-mix: 0%; }
-
         .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
         .hero { text-align: center; margin-bottom: 60px; }
         .hero h1 { font-size: 48px; margin-bottom: 10px; }
@@ -54,15 +54,38 @@
         .input-price { width: 100%; margin-bottom: 10px; background: var(--bg-main); border: 1px solid var(--border); color: var(--text-main); padding: 12px; border-radius: 8px; text-align: center; }
 
         .status-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: var(--bg-card); border-top: 1px solid var(--border); padding: 15px; text-align: center; font-weight: 600; color: var(--accent-green); display: none; z-index: 1000; }
+
+        /* --- MODAL REOWN STYLE --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; justify-content: center; align-items: center; }
+        .modal-content { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; width: 360px; padding: 24px; text-align: center; }
+        .modal-close { background: none; border: none; color: var(--text-sec); font-size: 24px; cursor: pointer; float: right; margin-top: -10px; }
+        .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+        .wallet-option { display: flex; align-items: center; gap: 15px; width: 100%; padding: 12px 16px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 12px; color: var(--text-main); font-size: 16px; font-weight: 600; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
+        .wallet-option:hover { border-color: var(--accent-blue); background: #2b3139; }
+        .wallet-icon { font-size: 24px; }
     </style>
 </head>
 <body>
 
     <nav class="navbar">
         <div class="logo">IOPN MARKETPLACE</div>
-        <!-- Bouton Reown : il gère tout seul la connexion ! -->
-        <w3m-button></w3m-button>
+        <button id="connectBtn" class="btn-connect">Connect Wallet</button>
     </nav>
+
+    <!-- Modale de connexion personnalisée -->
+    <div id="walletModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" id="closeModal">&times;</button>
+            <div class="modal-title">Connect Wallet</div>
+            
+            <button class="wallet-option" id="okxBtn">
+                <span class="wallet-icon">🔶</span> OKX Wallet
+            </button>
+            <button class="wallet-option" id="metaBtn">
+                <span class="wallet-icon">🦊</span> MetaMask
+            </button>
+        </div>
+    </div>
 
     <div class="container">
         <div class="hero">
@@ -84,25 +107,20 @@
 
     <div class="status-bar" id="statusBar">Chargement...</div>
 
-<!-- IMPORTATION DES MODULES MODERNES (Pas besoin de npm !) -->
-<script type="module">
-    import { ethers } from 'https://esm.sh/ethers@6.13.4'
-    import { createAppKit } from 'https://esm.sh/@reown/appkit@1.1.3'
-    import { EthersAdapter } from 'https://esm.sh/@reown/appkit-adapter-ethers@1.1.3?deps=ethers@6.13.4'
-
+<script>
     // ========== CONFIGURATION OBLIGATOIRE ==========
-    const NFT_ADDRESS = "0xc297F8e2De5482c93c41A41E3C9b41C3b841F9D7"; // Remplace
-    const MARKET_ADDRESS = "0xfBEa85a1f9F152D9a0e52744C673413046B3cf91"; // Remplace
+    const NFT_ADDRESS = "0xc297F8e2De5482c93c41A41E3C9b41C3b841F9D7";
+    const MARKET_ADDRESS = "0xfBEa85a1f9F152D9a0e52744C673413046B3cf91";
     const METADATA_CID = "bafkreiguappsizxhwwalgotc4jw6b56sj4ho3g7imsgkvgicf266e545nu";
-    const WC_PROJECT_ID = "5cc4861a079d75fe429b310014e36507"; // Colle ton Project ID ici
     
-    // CONFIGURATION DU RESEAU IOPN (Reown l'ajoutera tout seul aux wallets !)
-    const iopnNetwork = {
-        id: 901, // LE VRAI CHAIN ID DE IOPN (en nombre)
-        name: 'IOPN Testnet',
-        currency: 'IOPN',
-        explorerUrl: 'https://testnet-scan.iopn.io', // LE VRAI LIEN DE L'EXPLORER
-        rpcUrl: 'https://testnet-rpc.iopn.io' // LE VRAI LIEN RPC DE IOPN
+    // CONFIGURATION RESEAU IOPN (Pour l'ajouter automatiquement !)
+    const IOPN_CHAIN_ID = "0x385"; // 901 en hexadécimal. Change le si l'ID de IOPN est différent.
+    const IOPN_NETWORK = {
+        chainId: IOPN_CHAIN_ID,
+        chainName: "IOPN Testnet",
+        nativeCurrency: { name: "IOPN", symbol: "IOPN", decimals: 18 },
+        rpcUrls: ["https://testnet-rpc.iopn.io"], // Mets le bon RPC ici
+        blockExplorerUrls: ["https://testnet-scan.iopn.io"] // Mets le bon lien explorer ici
     };
     // ==============================================
 
@@ -122,47 +140,6 @@
 
     let provider, signer, nftContract, marketContract, userAddress;
 
-    // --- 1. INITIALISATION REOWN APPKIT ---
-    const adapter = new EthersAdapter();
-    
-    const modal = createAppKit({
-      adapters: [adapter],
-      networks: [iopnNetwork], // On déclare IOPN ici
-      projectId: WC_PROJECT_ID,
-      features: {
-        analytics: true,
-        injectUnsupportedChain: true // Permet d'ajouter le réseau automatiquement !
-      }
-    });
-
-    // --- 2. GESTION DE LA CONNEXION ---
-    modal.subscribeEvents((event) => {
-        if (event.data.event === 'CONNECT_SUCCESS') {
-            initDApp();
-        }
-        if (event.data.event === 'DISCONNECT') {
-            document.getElementById('mintBtn').style.display = 'none';
-            document.getElementById('searchBtn').style.display = 'none';
-        }
-    });
-
-    async function initDApp() {
-        try {
-            const walletProvider = await modal.getWalletProvider();
-            provider = new ethers.BrowserProvider(walletProvider);
-            signer = await provider.getSigner();
-            userAddress = await signer.getAddress();
-            
-            nftContract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
-            marketContract = new ethers.Contract(MARKET_ADDRESS, MARKET_ABI, signer);
-            
-            document.getElementById('mintBtn').style.display = 'inline-block';
-            document.getElementById('searchBtn').style.display = 'inline-block';
-            
-            loadNFT(0);
-        } catch(err) { console.error(err); }
-    }
-
     function showStatus(msg, isError=false) {
         const bar = document.getElementById("statusBar");
         bar.style.display = "block";
@@ -171,7 +148,66 @@
         if(!isError) setTimeout(() => { bar.style.display = "none"; }, 4000);
     }
 
-    // --- 3. LOGIQUE DU DAPP ---
+    // --- GESTION DE LA MODALE ---
+    document.getElementById("connectBtn").onclick = () => { document.getElementById("walletModal").style.display = "flex"; };
+    document.getElementById("closeModal").onclick = () => { document.getElementById("walletModal").style.display = "none"; };
+    window.onclick = (event) => { if (event.target == document.getElementById("walletModal")) document.getElementById("walletModal").style.display = "none"; };
+
+    // --- CONNEXION + AJOUT AUTO RESEAU ---
+    async function connectAndSetup(walletObj) {
+        try {
+            document.getElementById("walletModal").style.display = "none";
+            showStatus("Connexion en cours...");
+
+            provider = new ethers.BrowserProvider(walletObj);
+            
+            // Vérifier et changer de réseau si besoin
+            const network = await provider.getNetwork();
+            if (network.chainId.toString() !== parseInt(IOPN_CHAIN_ID, 16).toString()) {
+                showStatus("Ajout du réseau IOPN en cours...");
+                try {
+                    await walletObj.request({ method: "wallet_switchEthereumChain", params: [{ chainId: IOPN_CHAIN_ID }] });
+                } catch (switchError) {
+                    // Si le réseau n'existe pas (Erreur 4902), on l'ajoute automatiquement !
+                    if (switchError.code === 4902) {
+                        await walletObj.request({ method: "wallet_addEthereumChain", params: [IOPN_NETWORK] });
+                    } else { throw switchError; }
+                }
+                // Re-créer le provider après le changement de réseau
+                provider = new ethers.BrowserProvider(walletObj);
+            }
+
+            await provider.send("eth_requestAccounts", []);
+            signer = await provider.getSigner();
+            userAddress = await signer.getAddress();
+            
+            nftContract = new ethers.Contract(NFT_ADDRESS, NFT_ABI, signer);
+            marketContract = new ethers.Contract(MARKET_ADDRESS, MARKET_ABI, signer);
+            
+            document.getElementById("connectBtn").innerText = userAddress.substring(0, 6) + "..." + userAddress.substring(38);
+            document.getElementById("mintBtn").style.display = "inline-block";
+            document.getElementById("searchBtn").style.display = "inline-block";
+            
+            showStatus("Connecté avec succès !");
+            loadNFT(0);
+            
+        } catch (err) { 
+            console.error(err);
+            showStatus("Erreur de connexion ou de réseau", true); 
+        }
+    }
+
+    document.getElementById("okxBtn").onclick = () => {
+        if (typeof window.okxwallet !== "undefined") connectAndSetup(window.okxwallet);
+        else alert("OKX Wallet n'est pas installé !");
+    };
+
+    document.getElementById("metaBtn").onclick = () => {
+        if (typeof window.ethereum !== "undefined") connectAndSetup(window.ethereum);
+        else alert("MetaMask n'est pas installé !");
+    };
+
+    // --- LOGIQUE DU DAPP ---
     document.getElementById("mintBtn").onclick = async () => {
         try {
             showStatus("Transaction de Mint en cours...");
@@ -241,7 +277,6 @@
         }
     }
 
-    // Rendre les fonctions accessibles pour les boutons HTML
     window.approveNFT = async (tokenId) => {
         try {
             showStatus("Approbation en cours...");
